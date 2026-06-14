@@ -332,6 +332,10 @@ php artisan search:index --force
 
 Vector dimensions are fixed when the pgvector migration runs. Configure the dimensions before migrating.
 
+OpenAI's `text-embedding-3-small` defaults to 1,536 dimensions. KonnectFind
+explicitly sends `SEARCH_TEXT_DIMENSIONS` to the embeddings API, keeping the API
+response and pgvector column aligned.
+
 The image service defaults to a lightweight 64-dimensional visual representation. To use OpenCLIP, install `image-service/requirements-openclip.txt`, set `IMAGE_MODEL=openclip`, and set `SEARCH_IMAGE_DIMENSIONS` to the chosen model's output dimension before migration.
 
 ## API Endpoints

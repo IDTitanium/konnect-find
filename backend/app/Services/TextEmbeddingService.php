@@ -32,6 +32,7 @@ class TextEmbeddingService
             ->post(rtrim(config('services.search.openai_base_url'), '/').'/embeddings', [
                 'model' => config('services.search.openai_embedding_model'),
                 'input' => $text,
+                'dimensions' => config('services.search.text_dimensions'),
             ])->throw()->json();
 
         return $response['data'][0]['embedding'];

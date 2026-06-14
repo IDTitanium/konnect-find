@@ -58,6 +58,21 @@ SEARCH_IMAGE_PROVIDER=local
 SEARCH_IMAGE_DIMENSIONS=64
 ```
 
+For production-quality OpenAI text embeddings, replace the text settings with:
+
+```dotenv
+SEARCH_TEXT_PROVIDER=openai
+SEARCH_TEXT_DIMENSIONS=1536
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+Set the text dimensions before the first PostgreSQL migration because the
+pgvector column dimension is fixed when it is created. If the database was
+already migrated with another dimension, create a new database or perform a
+controlled vector-column migration before re-indexing.
+
 Laravel Cloud generates and injects `APP_KEY` and attached resource
 credentials. Do not commit secrets.
 
@@ -145,3 +160,6 @@ IMAGE_SERVICE_TOKEN=the-generated-render-token \
 
 Run `php artisan search:index --force` in Laravel Cloud after the connection is
 verified.
+
+After enabling OpenAI text embeddings, run the same indexing command again so
+every product and subsequent query uses the same model and vector dimension.
