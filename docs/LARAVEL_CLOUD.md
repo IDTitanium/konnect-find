@@ -99,16 +99,35 @@ it never reseeds or resets inventory.
 ## 6. First Deployment Bootstrap
 
 After the first successful deployment, open the Cloud environment's
-**Commands** tab and run these once:
+**Commands** tab. For the full 500-vendor, 250,000-product demonstration
+catalogue, run this once before accepting real orders:
+
+```bash
+php artisan marketplace:bootstrap-large --replace --force --batch=1000
+```
+
+The command deterministically generates the 132 MB JSON file on the Cloud
+instance's temporary filesystem, stream-imports it in database batches,
+verifies the totals, and deletes the file. `--replace` deletes existing
+products and vendors, so only use it for the initial bootstrap or an
+environment that can safely lose its catalogue.
+
+To safely re-run the deterministic import later without deleting existing
+records, omit `--replace --force`:
+
+```bash
+php artisan marketplace:bootstrap-large --batch=1000
+```
+
+For the small curated demonstration catalogue instead, run:
 
 ```bash
 php artisan db:seed --force
 php artisan search:index --force
 ```
 
-This creates the small curated demonstration catalogue and indexes it using the
-deterministic providers. Do not run `db:seed` repeatedly against active
-production inventory.
+Do not add the large bootstrap command to the deploy command. Deployments
+should remain fast and must never reset active inventory.
 
 ## 7. Validate
 
@@ -131,8 +150,8 @@ Before the one-time catalogue bootstrap, use
 ## Production Scale Notes
 
 - Start with the curated catalogue for reliable assessment demonstrations.
-- Importing 250,000 products should be performed as a controlled one-time Cloud
-  command and followed by background embedding indexing.
+- Import 250,000 products with `marketplace:bootstrap-large` as a controlled
+  one-time Cloud command.
 - Use a dedicated worker or managed queue before indexing a large catalogue.
 - Add Object Storage if product or vendor uploads are introduced; the Cloud
   application filesystem is ephemeral.

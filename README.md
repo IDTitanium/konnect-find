@@ -168,6 +168,18 @@ php artisan marketplace:import-seeder --fresh
 php artisan db:seed --class=MarketplaceJsonSeeder
 ```
 
+On Laravel Cloud, use the one-command production bootstrap instead of shipping
+the 132 MB JSON file in every deployment:
+
+```bash
+php artisan marketplace:bootstrap-large --replace --force --batch=1000
+```
+
+It generates the file in temporary storage, stream-imports and verifies the
+catalogue, then removes the file. Do not place this command in the normal deploy
+script. After the initial bootstrap, omit `--replace --force` for a
+non-destructive deterministic upsert.
+
 The large importer deliberately does not generate search embeddings. Indexing
 250,000 products is a separate, resource-intensive operation:
 

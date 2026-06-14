@@ -35,4 +35,20 @@ class MarketplaceSeederTest extends TestCase
 
         unlink($path);
     }
+
+    public function test_large_marketplace_bootstrap_imports_and_removes_its_temporary_file(): void
+    {
+        $temporaryFilesBefore = glob(storage_path('app/marketplace-seeder-*.json'));
+
+        $this->artisan('marketplace:bootstrap-large', [
+            '--vendors' => 2,
+            '--products-per-vendor' => 3,
+            '--replace' => true,
+            '--force' => true,
+        ])->assertSuccessful();
+
+        $this->assertSame(2, Vendor::count());
+        $this->assertSame(6, Product::count());
+        $this->assertSame($temporaryFilesBefore, glob(storage_path('app/marketplace-seeder-*.json')));
+    }
 }
