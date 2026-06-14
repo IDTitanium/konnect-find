@@ -123,3 +123,25 @@ Before the one-time catalogue bootstrap, use
   application filesystem is ephemeral.
 - Keep `SEARCH_IMAGE_PROVIDER=local` unless the Python image service is hosted
   separately at a reachable HTTPS URL.
+
+## Connect The Hosted Image Service
+
+Deploy the Python service separately using the repository's `render.yaml`
+Blueprint. Then set these Laravel Cloud variables and redeploy:
+
+```dotenv
+SEARCH_IMAGE_PROVIDER=service
+IMAGE_EMBEDDING_SERVICE_URL=https://konnectfind-image-service.onrender.com
+IMAGE_EMBEDDING_SERVICE_TOKEN=the-generated-render-token
+SEARCH_IMAGE_DIMENSIONS=64
+```
+
+Verify it before indexing:
+
+```bash
+IMAGE_SERVICE_TOKEN=the-generated-render-token \
+  ./scripts/image-service-smoke-test.sh https://konnectfind-image-service.onrender.com
+```
+
+Run `php artisan search:index --force` in Laravel Cloud after the connection is
+verified.

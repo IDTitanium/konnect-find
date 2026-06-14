@@ -3,13 +3,19 @@ from io import BytesIO
 from urllib.parse import urlparse
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from PIL import Image
 
 app = FastAPI(title="KonnectFind Image Embedding Service", version="0.2.0")
 model_name = os.getenv("IMAGE_MODEL", "local")
+service_token = os.getenv("IMAGE_SERVICE_TOKEN", "")
 clip_model = None
 clip_preprocess = None
+
+
+def authorize(authorization: str | None = Header(default=None)) -> None:
+    if service_token and authorization != f"Bearer {service_token}":
+        raise HTTPException(status_code=401, detail="A valid service token is required.")
 
 
 def load_openclip() -> None:
@@ -61,13 +67,13 @@ def health() -> dict[str, str]:
     return {"status": "ok", "model": model_name}
 
 
-@app.post("/embed")
+@app.post("/embed", dependencies=[Depends(authorize)])
 async def embed(image: UploadFile = File(...)) -> dict[str, object]:
     vector = create_embedding(parse_image(await image.read()))
     return {"model": model_name, "dimension": len(vector), "embedding": vector}
 
 
-@app.post("/embed-url")
+@app.post("/embed-url", dependencies=[Depends(authorize)])
 async def embed_url(payload: dict[str, str]) -> dict[str, object]:
     url = payload.get("url", "")
     if urlparse(url).scheme not in {"http", "https"}:

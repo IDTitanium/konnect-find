@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: konnectfind-image-service
+    runtime: docker
+    rootDir: image-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: IMAGE_MODEL
+        value: local
+      - key: IMAGE_SERVICE_TOKEN
+        generateValue: true

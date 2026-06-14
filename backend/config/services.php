@@ -44,6 +44,7 @@ return [
         'image_provider' => env('SEARCH_IMAGE_PROVIDER', 'local'),
         'image_dimensions' => (int) env('SEARCH_IMAGE_DIMENSIONS', 64),
         'image_service_url' => env('IMAGE_EMBEDDING_SERVICE_URL', 'http://127.0.0.1:8001'),
+        'image_service_token' => env('IMAGE_EMBEDDING_SERVICE_TOKEN'),
     ],
 
 ];

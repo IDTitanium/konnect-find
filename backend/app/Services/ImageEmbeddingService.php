@@ -10,7 +10,7 @@ class ImageEmbeddingService
     public function embedUpload(UploadedFile $image): array
     {
         if (config('services.search.image_provider') === 'service') {
-            return Http::timeout(60)
+            return $this->client()
                 ->attach('image', file_get_contents($image->getRealPath()), $image->getClientOriginalName())
                 ->post(rtrim(config('services.search.image_service_url'), '/').'/embed')
                 ->throw()->json('embedding');
@@ -22,7 +22,7 @@ class ImageEmbeddingService
     public function embedUrl(string $url): array
     {
         if (config('services.search.image_provider') === 'service') {
-            return Http::timeout(60)
+            return $this->client()
                 ->post(rtrim(config('services.search.image_service_url'), '/').'/embed-url', ['url' => $url])
                 ->throw()->json('embedding');
         }
@@ -40,5 +40,13 @@ class ImageEmbeddingService
         $bytes = array_values(unpack('C*', hash('sha512', $value, true)));
 
         return VectorMath::normalize(array_map(fn (int $byte) => ($byte / 127.5) - 1, $bytes));
+    }
+
+    private function client()
+    {
+        $client = Http::timeout(60);
+        $token = config('services.search.image_service_token');
+
+        return $token ? $client->withToken($token) : $client;
     }
 }
