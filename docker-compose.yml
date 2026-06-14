@@ -1,0 +1,21 @@
+services:
+  database:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: konnectfind
+      POSTGRES_USER: konnectfind
+      POSTGRES_PASSWORD: konnectfind
+    ports:
+      - "5432:5432"
+    volumes:
+      - database-data:/var/lib/postgresql/data
+
+  image-service:
+    build: ./image-service
+    environment:
+      IMAGE_MODEL: local
+    ports:
+      - "8001:8001"
+
+volumes:
+  database-data:

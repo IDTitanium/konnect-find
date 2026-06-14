@@ -1,0 +1,63 @@
+{
+    "queries": 7,
+    "k": 5,
+    "metrics": {
+        "precision_at_k": 0.2571,
+        "recall_at_k": 1,
+        "mrr": 0.9286,
+        "ndcg_at_k": 0.9473
+    },
+    "details": [
+        {
+            "query": "durable school bag for my pikin",
+            "precision_at_k": 0.2,
+            "recall_at_k": 1,
+            "mrr": 1,
+            "ndcg_at_k": 1
+        },
+        {
+            "query": "heavy-duty power solution for home",
+            "precision_at_k": 0.4,
+            "recall_at_k": 1,
+            "mrr": 1,
+            "ndcg_at_k": 1
+        },
+        {
+            "query": "classy black outfit for a burial",
+            "precision_at_k": 0.2,
+            "recall_at_k": 1,
+            "mrr": 1,
+            "ndcg_at_k": 1
+        },
+        {
+            "query": "comfortable kicks for everyday movement",
+            "precision_at_k": 0.2,
+            "recall_at_k": 1,
+            "mrr": 1,
+            "ndcg_at_k": 1
+        },
+        {
+            "query": "professional bag for work laptop",
+            "precision_at_k": 0.2,
+            "recall_at_k": 1,
+            "mrr": 1,
+            "ndcg_at_k": 1
+        },
+        {
+            "query": "traditional handbag for an occasion",
+            "precision_at_k": 0.2,
+            "recall_at_k": 1,
+            "mrr": 0.5,
+            "ndcg_at_k": 0.6309297535714575
+        },
+        {
+            "query": "colourful owambe outfit",
+            "precision_at_k": 0.4,
+            "recall_at_k": 1,
+            "mrr": 1,
+            "ndcg_at_k": 1
+        }
+    ],
+    "generated_at": "2026-06-14T19:38:03+00:00",
+    "dataset": "database/evaluation/search_queries.json"
+}

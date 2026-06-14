@@ -1,0 +1,14 @@
+.DS_Store
+.env
+
+backend/.env
+backend/database/database.sqlite
+backend/database/data/seeder.json
+backend/storage/logs/
+backend/vendor/
+
+frontend/dist/
+frontend/node_modules/
+
+image-service/.venv/
+__pycache__/

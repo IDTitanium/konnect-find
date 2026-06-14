@@ -1,0 +1,19 @@
+
+  GET|HEAD   api/analytics/abandonment-rate AnalyticsController@abandonmentRa…
+  GET|HEAD   api/analytics/category-gaps .... AnalyticsController@categoryGaps
+  GET|HEAD   api/analytics/commerce-summary AnalyticsController@commerceSumma…
+  GET|HEAD   api/analytics/search-volume .... AnalyticsController@searchVolume
+  GET|HEAD   api/analytics/summary ............... AnalyticsController@summary
+  GET|HEAD   api/analytics/vendor-performance AnalyticsController@vendorPerfo…
+  GET|HEAD   api/analytics/zero-results ...... AnalyticsController@zeroResults
+  GET|HEAD   api/health .............................. SystemController@health
+  POST       api/orders ........................ CommerceController@storeOrder
+  GET|HEAD   api/orders/{reference} ............. CommerceController@showOrder
+  GET|HEAD   api/products/{product} ............... CommerceController@product
+  POST       api/search .............................. SearchController@search
+  POST       api/search/click ......................... SearchController@click
+  GET|HEAD   api/vendors ......................... MarketplaceController@index
+  GET|HEAD   api/vendors/{vendor} ................. MarketplaceController@show
+
+                                                           Showing [15] routes
+

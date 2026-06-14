@@ -1,0 +1,14 @@
+
+  Migration name .............................................. Batch / Status  
+  0001_01_01_000000_create_users_table ............................... [1] Ran  
+  0001_01_01_000001_create_cache_table ............................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ................................ [1] Ran  
+  2026_06_14_020657_create_products_table ............................ [1] Ran  
+  2026_06_14_020658_create_search_logs_table ......................... [1] Ran  
+  2026_06_14_020659_create_search_results_table ...................... [1] Ran  
+  2026_06_14_020660_create_search_clicks_table ....................... [1] Ran  
+  2026_06_14_131908_add_embeddings_to_products_table ................. [1] Ran  
+  2026_06_14_151952_create_vendors_table ............................. [1] Ran  
+  2026_06_14_151953_add_marketplace_fields_to_products_and_search_logs  [1] Ran  
+  2026_06_14_200000_create_orders_and_order_items_tables ............. [2] Ran  
+
