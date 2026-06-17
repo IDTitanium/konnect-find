@@ -73,6 +73,25 @@ pgvector column dimension is fixed when it is created. If the database was
 already migrated with another dimension, create a new database or perform a
 controlled vector-column migration before re-indexing.
 
+If indexing fails with an error like `expected 128 dimensions, not 1536`, the
+database was migrated with `SEARCH_TEXT_DIMENSIONS=128` and the current
+environment is generating 1,536-dimensional vectors. For the fastest deployed
+fix, set `SEARCH_TEXT_DIMENSIONS=128`, run `php artisan optimize:clear`, and
+then run `php artisan search:index --force` again.
+
+For the higher-quality OpenAI setup, keep `SEARCH_TEXT_DIMENSIONS=1536`,
+deploy the migration that rebuilds `text_embedding_vector` as `vector(1536)`,
+then run:
+
+```bash
+php artisan optimize:clear
+php artisan migrate --force
+php artisan search:index --force
+```
+
+The migration clears existing text embeddings because 128-dimensional vectors
+cannot be reused in a 1,536-dimensional pgvector column.
+
 Laravel Cloud generates and injects `APP_KEY` and attached resource
 credentials. Do not commit secrets.
 

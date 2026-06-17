@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class ProductEmbeddingIndexer
 {
@@ -26,6 +27,9 @@ class ProductEmbeddingIndexer
         ]);
 
         if (DB::getDriverName() === 'pgsql') {
+            $this->assertPgVectorDimensions('text_embedding_vector', $text);
+            $this->assertPgVectorDimensions('image_embedding_vector', $image);
+
             DB::table('products')->where('id', $product->id)->update([
                 'text_embedding_vector' => DB::raw("'".VectorMath::pgVector($text)."'::vector"),
                 'image_embedding_vector' => DB::raw("'".VectorMath::pgVector($image)."'::vector"),
@@ -43,5 +47,31 @@ class ProductEmbeddingIndexer
             $product->description,
             implode(', ', $product->search_terms ?? []),
         ]);
+    }
+
+    private function assertPgVectorDimensions(string $column, array $embedding): void
+    {
+        $row = DB::selectOne(<<<'SQL'
+            SELECT format_type(a.atttypid, a.atttypmod) AS type
+            FROM pg_attribute a
+            WHERE a.attrelid = 'products'::regclass
+              AND a.attname = ?
+              AND NOT a.attisdropped
+            SQL, [$column]);
+
+        $type = $row->type ?? null;
+        if (! is_string($type) || ! preg_match('/^vector\((\d+)\)$/', $type, $matches)) {
+            return;
+        }
+
+        $expected = (int) $matches[1];
+        $actual = count($embedding);
+
+        if ($expected !== $actual) {
+            throw new RuntimeException(
+                "$column is $type, but the generated embedding has $actual dimensions. ".
+                'Keep the matching SEARCH_*_DIMENSIONS value or migrate to a new vector dimension before re-indexing.'
+            );
+        }
     }
 }
