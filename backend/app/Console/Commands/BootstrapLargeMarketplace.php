@@ -29,7 +29,7 @@ class BootstrapLargeMarketplace extends Command
         $replace = (bool) $this->option('replace');
 
         if ($replace && ! $this->option('force') && ! $this->confirm('Delete all existing products and vendors before importing?')) {
-            $this->components->warn('Marketplace bootstrap cancelled.');
+            // $this->components->warn('Marketplace bootstrap cancelled.');
 
             return self::FAILURE;
         }
@@ -74,7 +74,7 @@ class BootstrapLargeMarketplace extends Command
             }
 
             $this->components->info(number_format($vendors).' vendors and '.number_format($expectedProducts).' products are ready.');
-            $this->components->warn('Embeddings were not generated. Index them separately using a background worker.');
+            $this->components->info('Embeddings were not generated. Index them separately using a background worker.');
 
             return self::SUCCESS;
         } finally {
