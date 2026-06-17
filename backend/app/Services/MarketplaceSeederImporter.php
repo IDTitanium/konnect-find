@@ -33,6 +33,14 @@ class MarketplaceSeederImporter
                 continue;
             }
             if ($trimmed === '"products":[') {
+                if ($vendors) {
+                    $vendorCount += $this->upsertVendors($vendors);
+                    $vendors = [];
+                    if ($progress) {
+                        $progress('vendors', $vendorCount);
+                    }
+                }
+
                 $section = 'products';
 
                 continue;

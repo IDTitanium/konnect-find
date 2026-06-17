@@ -36,6 +36,28 @@ class MarketplaceSeederTest extends TestCase
         unlink($path);
     }
 
+    public function test_vendor_buffer_is_flushed_before_large_product_batches(): void
+    {
+        $path = storage_path('framework/testing-marketplace-batched-seeder.json');
+
+        $this->artisan('marketplace:generate-seeder', [
+            '--vendors' => 2,
+            '--products-per-vendor' => 60,
+            '--path' => $path,
+        ])->assertSuccessful();
+
+        $this->artisan('marketplace:import-seeder', [
+            '--path' => $path,
+            '--fresh' => true,
+            '--batch' => 100,
+        ])->assertSuccessful();
+
+        $this->assertSame(2, Vendor::count());
+        $this->assertSame(120, Product::count());
+
+        unlink($path);
+    }
+
     public function test_large_marketplace_bootstrap_imports_and_removes_its_temporary_file(): void
     {
         $temporaryFilesBefore = glob(storage_path('app/marketplace-seeder-*.json'));
