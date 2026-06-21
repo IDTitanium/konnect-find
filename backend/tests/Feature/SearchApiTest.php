@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Vendor;
+use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -59,6 +60,33 @@ class SearchApiTest extends TestCase
             ->assertJsonPath('results.0.category', 'Power')
             ->assertJsonMissingPath('results.0.text_embedding')
             ->assertJsonMissingPath('results.0.image_embedding');
+    }
+
+    public function test_embeddings_can_be_exported_and_imported_for_seeded_products(): void
+    {
+        $path = storage_path('framework/testing/product-embeddings.jsonl');
+        if (! is_dir(dirname($path))) {
+            mkdir(dirname($path), 0777, true);
+        }
+        if (is_file($path)) {
+            unlink($path);
+        }
+
+        $this->artisan('search:index', ['--limit' => 2])->assertSuccessful();
+        $this->artisan('search:export-embeddings', ['--path' => $path])->assertSuccessful();
+
+        Product::query()->update([
+            'text_embedding' => null,
+            'image_embedding' => null,
+            'text_embedding_model' => null,
+            'image_embedding_model' => null,
+            'embeddings_indexed_at' => null,
+        ]);
+
+        $this->artisan('search:import-embeddings', ['--path' => $path])->assertSuccessful();
+
+        $indexed = Product::query()->whereNotNull('text_embedding')->whereNotNull('image_embedding')->count();
+        $this->assertSame(2, $indexed);
     }
 
     public function test_search_can_be_scoped_to_a_vendor_storefront(): void

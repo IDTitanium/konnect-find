@@ -1,4 +1,4 @@
-import { FormEvent, MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, MouseEvent, SyntheticEvent, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 
 type Product = {
@@ -65,6 +65,17 @@ const suggestions = [
 const sessionId = crypto.randomUUID()
 const money = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 })
 
+const fallbackImage = 'data:image/svg+xml,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400"><rect width="400" height="400" fill="#e7e6de"/><g fill="none" stroke="#9aa79e" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"><rect x="128" y="138" width="144" height="112" rx="14"/><circle cx="166" cy="178" r="14"/><path d="M150 240 188 202 214 226 250 188 272 208"/></g><text x="200" y="292" font-family="DM Sans, sans-serif" font-size="19" fill="#8a9690" text-anchor="middle">Image unavailable</text></svg>`
+)
+
+function handleImageError(event: SyntheticEvent<HTMLImageElement>) {
+  const img = event.currentTarget
+  if (img.dataset.fallback) return
+  img.dataset.fallback = '1'
+  img.src = fallbackImage
+}
+
 function App() {
   const [view, setView] = useState<'search' | 'analytics'>('search')
   const [query, setQuery] = useState('')
@@ -94,6 +105,9 @@ function App() {
   const [checkoutError, setCheckoutError] = useState('')
   const [order, setOrder] = useState<OrderResponse | null>(null)
   const feedRef = useRef<HTMLDivElement>(null)
+  const resultsRef = useRef<HTMLElement>(null)
+  const [resultView, setResultView] = useState<'grid' | 'orbit'>('grid')
+  const [isDesktop, setIsDesktop] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 760 : true)
 
   const imagePreview = useMemo(() => image ? URL.createObjectURL(image) : '', [image])
   const hasResults = Boolean(response?.results.length)
@@ -105,12 +119,24 @@ function App() {
   }, [view])
 
   useEffect(() => {
+    const onResize = () => setIsDesktop(window.innerWidth > 760)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  useEffect(() => {
     fetch('/api/vendors').then((result) => result.json()).then(setVendors)
   }, [])
 
   useEffect(() => {
     localStorage.setItem('konnectfind-cart', JSON.stringify(cart))
   }, [cart])
+
+  useEffect(() => {
+    if (response && view === 'search' && window.innerWidth > 760) {
+      requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    }
+  }, [response, view])
 
   async function search(event?: FormEvent, queryOverride?: string) {
     event?.preventDefault()
@@ -136,8 +162,35 @@ function App() {
     }
   }
 
+  async function openVendor(vendor: Vendor) {
+    setSelectedVendor(vendor)
+    setQuery('')
+    setImage(null)
+    setLoading(true)
+    setError('')
+    try {
+      const result = await fetch(`/api/vendors/${vendor.slug}`)
+      if (!result.ok) throw new Error('This storefront could not be opened.')
+      const data: Vendor & { products: Product[] } = await result.json()
+      const results: Product[] = (data.products ?? []).map((product, index) => ({
+        ...product,
+        price: product.price ?? Math.round((product as Product & { price_kobo?: number }).price_kobo ?? 0) / 100,
+        vendor,
+        rank: index + 1,
+        score: 1,
+        source: 'storefront',
+      }))
+      setResponse({ search_id: 0, search_type: 'storefront', result_count: results.length, results })
+      setActiveProduct(0)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'This storefront could not be opened.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function recordClick(product: Product) {
-    if (!response) return
+    if (!response || !response.search_id) return
     await fetch('/api/search/click', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -296,12 +349,12 @@ function App() {
               <div className="storefronts">
                 <div className="storefronts-heading"><span>Shop trusted storefronts</span><small>{vendors.length} independent vendors</small></div>
                 <div className="storefront-list">
-                  <button className={!selectedVendor ? 'selected' : ''} onClick={() => setSelectedVendor(null)}>
+                  <button className={!selectedVendor ? 'selected' : ''} onClick={() => { setSelectedVendor(null); refineSearch() }}>
                     <span className="store-avatar marketplace-avatar">K</span>
                     <span><b>All vendors</b><small>Marketplace-wide search</small></span>
                   </button>
                   {vendors.map((vendor) => (
-                    <button key={vendor.id} className={selectedVendor?.id === vendor.id ? 'selected' : ''} onClick={() => setSelectedVendor(vendor)}>
+                    <button key={vendor.id} className={selectedVendor?.id === vendor.id ? 'selected' : ''} onClick={() => openVendor(vendor)}>
                       <VendorAvatar vendor={vendor} />
                       <span><b>{vendor.name}{vendor.is_verified && <VerifiedIcon />}</b><small>{vendor.location} · {vendor.products_count} products</small></span>
                     </button>
@@ -311,16 +364,25 @@ function App() {
             </div>
           </section>
 
-          <section className="results-section">
+          <section className="results-section" ref={resultsRef}>
             <div className="section-heading">
               <div>
-                <span className="eyebrow">{response ? `${selectedVendor?.name ?? 'Marketplace'} · ${response.search_type} search` : 'Curated marketplace'}</span>
-                <h2>{response ? `${response.result_count} relevant products` : 'Ready when you are'}</h2>
+                <span className="eyebrow">{response ? (response.search_type === 'storefront' ? `${selectedVendor?.name ?? 'Storefront'} · storefront` : `${selectedVendor?.name ?? 'Marketplace'} · ${response.search_type} search`) : 'Curated marketplace'}</span>
+                <h2>{response ? (response.search_type === 'storefront' ? `${response.result_count} ${response.result_count === 1 ? 'product' : 'products'} in store` : `${response.result_count} relevant products`) : 'Ready when you are'}</h2>
               </div>
-              {response && <div className="result-note"><span>Ranked by meaning and visual similarity</span><button onClick={refineSearch}>Refine search</button></div>}
+              {response && <div className="result-note">
+                {hasResults && isDesktop && (
+                  <div className="view-toggle" role="tablist" aria-label="Result view">
+                    <button role="tab" aria-selected={resultView === 'grid'} className={resultView === 'grid' ? 'active' : ''} onClick={() => setResultView('grid')}><GridIcon /> Grid</button>
+                    <button role="tab" aria-selected={resultView === 'orbit'} className={resultView === 'orbit' ? 'active' : ''} onClick={() => setResultView('orbit')}><OrbitIcon /> Discovery orbit</button>
+                  </div>
+                )}
+                <button className="result-refine" onClick={refineSearch}>{response.search_type === 'storefront' ? 'Back to search' : 'Refine search'}</button>
+              </div>}
             </div>
             {error && <div className="notice error">{error}</div>}
-            {response?.result_count === 0 && <div className="notice"><b>No close matches yet.</b> This search has been logged so the catalogue team can close the discovery gap.</div>}
+            {response?.search_type === 'storefront' && response.result_count === 0 && <div className="notice"><b>This storefront has no active products yet.</b> Try another vendor or search across the marketplace.</div>}
+            {response?.search_type !== 'storefront' && response?.result_count === 0 && <div className="notice"><b>No close matches yet.</b> This search has been logged so the catalogue team can close the discovery gap.</div>}
             {hasResults && (
               <div className="mobile-feed-topbar">
                 <button className="mobile-feed-brand" onClick={refineSearch} aria-label="Return to search">
@@ -328,23 +390,30 @@ function App() {
                 </button>
                 <button className="mobile-query" onClick={refineSearch}>
                   <SearchIcon />
-                  <span>{query || 'Image search'}</span>
+                  <span>{response?.search_type === 'storefront' ? (selectedVendor?.name ?? 'Storefront') : (query || 'Image search')}</span>
                 </button>
                 <button className="mobile-cart-trigger" onClick={() => setCommercePanel('cart')} aria-label={`Open cart with ${cartCount} items`}><BagIcon />{cartCount > 0 && <b>{cartCount}</b>}</button>
                 <span className="mobile-feed-count">{activeProduct + 1}/{response?.result_count}</span>
               </div>
             )}
+            {resultView === 'orbit' && isDesktop && hasResults ? (
+              <OrbitView
+                results={response!.results}
+                centerLabel={response!.search_type === 'storefront' ? (selectedVendor?.name ?? 'Storefront') : (query || 'Image search')}
+                onSelect={viewProduct}
+              />
+            ) : (
             <div className="product-grid" ref={feedRef} onScroll={updateActiveProduct}>
               {response?.results.map((product) => (
                 <article className="product-card" key={product.id} onClick={() => viewProduct(product)}>
                   <div className="product-image">
-                    <img src={product.image_url} alt={product.name} />
+                    <img src={product.image_url} alt={product.name} onError={handleImageError} />
                     <span>#{product.rank}</span>
                     <div className="mobile-image-shade" />
                   </div>
                   <div className="product-body">
                     <div className="vendor-line"><VendorAvatar vendor={product.vendor} /><span><b>{product.vendor.name}{product.vendor.is_verified && <VerifiedIcon />}</b><small>{product.vendor.location} · Ships in {product.vendor.fulfillment_days} days</small></span></div>
-                    <div className="product-meta"><span>{product.category}</span><small>{Math.round(product.score * 100)}% match</small></div>
+                    <div className="product-meta"><span>{product.category}</span><small>{product.source === 'storefront' ? `${product.inventory_count} in stock` : `${Math.round(product.score * 100)}% match`}</small></div>
                     <h3>{product.name}</h3>
                     <p>{product.description}</p>
                     <strong>{money.format(product.price)}</strong>
@@ -355,7 +424,7 @@ function App() {
                     <button className="mobile-shop-button" onClick={(event) => { event.stopPropagation(); viewProduct(product) }}>View product <ArrowIcon /></button>
                   </div>
                   <div className="mobile-action-rail">
-                    <button className="mobile-vendor-avatar" onClick={(event) => { event.stopPropagation(); setSelectedVendor(product.vendor); refineSearch() }} aria-label={`Open ${product.vendor.name} storefront`}><VendorAvatar vendor={product.vendor} /><small>Store</small></button>
+                    <button className="mobile-vendor-avatar" onClick={(event) => { event.stopPropagation(); openVendor(product.vendor) }} aria-label={`Open ${product.vendor.name} storefront`}><VendorAvatar vendor={product.vendor} /><small>Store</small></button>
                     <button className={savedProducts.has(product.id) ? 'saved' : ''} onClick={(event) => toggleSaved(event, product.id)} aria-label="Save product">
                       <HeartIcon filled={savedProducts.has(product.id)} />
                       <small>{savedProducts.has(product.id) ? 'Saved' : 'Save'}</small>
@@ -369,7 +438,8 @@ function App() {
                 </article>
               ))}
             </div>
-            {hasResults && (
+            )}
+            {hasResults && resultView === 'grid' && (
               <div className="mobile-feed-progress" aria-hidden="true">
                 {response?.results.map((product, index) => <i key={product.id} className={index === activeProduct ? 'active' : ''} />)}
               </div>
@@ -429,9 +499,90 @@ function App() {
   )
 }
 
+function OrbitView({ results, centerLabel, onSelect }: { results: Product[]; centerLabel: string; onSelect: (product: Product) => void }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(false)
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setMounted(true)))
+    return () => cancelAnimationFrame(id)
+  }, [results])
+
+  const nodes = useMemo(() => {
+    const scores = results.map((product) => product.score)
+    const max = Math.max(...scores)
+    const min = Math.min(...scores)
+    const span = max - min || 1
+    return results.map((product, index) => {
+      const norm = (product.score - min) / span
+      const radius = 17 + (1 - norm) * 30
+      const angle = index * 2.39996323
+      return {
+        product,
+        index,
+        norm,
+        x: 50 + radius * Math.cos(angle),
+        y: 50 + radius * Math.sin(angle),
+        size: 56 + norm * 56,
+      }
+    })
+  }, [results])
+
+  return (
+    <div className="orbit-view">
+      <div className={`orbit-stage ${mounted ? 'mounted' : ''}`}>
+        <svg className="orbit-web" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <circle className="orbit-ring" cx="50" cy="50" r="19" vectorEffect="non-scaling-stroke" />
+          <circle className="orbit-ring" cx="50" cy="50" r="33" vectorEffect="non-scaling-stroke" />
+          <circle className="orbit-ring" cx="50" cy="50" r="47" vectorEffect="non-scaling-stroke" />
+          {nodes.map((node) => (
+            <line key={node.product.id} className={`orbit-link src-${node.product.source}`} x1="50" y1="50" x2={node.x} y2={node.y} style={{ opacity: 0.14 + node.norm * 0.5 }} vectorEffect="non-scaling-stroke" />
+          ))}
+        </svg>
+
+        <div className="orbit-core" aria-hidden="true">
+          <SearchIcon />
+          <span>{centerLabel}</span>
+        </div>
+
+        {nodes.map((node) => (
+          <div className="orbit-node" key={node.product.id} style={{ left: `${node.x}%`, top: `${node.y}%`, zIndex: Math.round(node.norm * 10) + 2 }}>
+            <button
+              className={`orbit-planet src-${node.product.source}`}
+              style={{ width: node.size, height: node.size, transitionDelay: `${node.index * 60}ms` }}
+              onClick={() => onSelect(node.product)}
+              aria-label={`${node.product.name}, ${Math.round(node.product.score * 100)} percent match`}
+            >
+              <img src={node.product.image_url} alt={node.product.name} onError={handleImageError} />
+              <span className="orbit-score">{Math.round(node.product.score * 100)}%</span>
+            </button>
+            <div className="orbit-label">
+              <b>{node.product.name}</b>
+              <small>{node.product.vendor.name} · {money.format(node.product.price)}</small>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="orbit-legend">
+        <span><i className="orbit-dot core" /> Your intent</span>
+        <span><i className="orbit-dot text" /> Matched your words</span>
+        <span><i className="orbit-dot image" /> Matched your image</span>
+        <span className="orbit-legend-note">Closer to the centre means a stronger match · larger planet means higher rank</span>
+      </div>
+    </div>
+  )
+}
+
+function GridIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
+}
+
+function OrbitIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.4" /><ellipse cx="12" cy="12" rx="9" ry="4.2" /><ellipse cx="12" cy="12" rx="9" ry="4.2" transform="rotate(60 12 12)" /></svg>
+}
+
 function ProductDetails({ product, saved, onSave, onAdd }: { product: Product; saved: boolean; onSave: (event: MouseEvent) => void; onAdd: () => void }) {
   return <div className="product-details">
-    <div className="detail-image"><img src={product.image_url} alt={product.name} /><span>{product.category}</span></div>
+    <div className="detail-image"><img src={product.image_url} alt={product.name} onError={handleImageError} /><span>{product.category}</span></div>
     <div className="detail-content">
       <div className="vendor-line"><VendorAvatar vendor={product.vendor} /><span><b>{product.vendor.name}{product.vendor.is_verified && <VerifiedIcon />}</b><small>{product.vendor.location} · Ships in {product.vendor.fulfillment_days} days · {product.vendor.rating} rating</small></span></div>
       <h2>{product.name}</h2>
@@ -452,7 +603,7 @@ function CartPanel({ cart, subtotal, onQuantity, onCheckout, onContinue }: { car
     <div className="panel-heading"><span className="eyebrow">Your marketplace basket</span><h2>{cart.length ? `${cart.reduce((total, item) => total + item.quantity, 0)} items` : 'Your cart is empty'}</h2></div>
     <div className="cart-items">
       {cart.map(({ product, quantity }) => <div className="cart-item" key={product.id}>
-        <img src={product.image_url} alt={product.name} />
+        <img src={product.image_url} alt={product.name} onError={handleImageError} />
         <div><small>{product.vendor.name}</small><b>{product.name}</b><strong>{money.format(product.price)}</strong><span>{product.inventory_count} available</span></div>
         <div className="quantity-control"><button onClick={() => onQuantity(product.id, quantity - 1)}>−</button><span>{quantity}</span><button disabled={quantity >= product.inventory_count} onClick={() => onQuantity(product.id, quantity + 1)}>+</button></div>
       </div>)}

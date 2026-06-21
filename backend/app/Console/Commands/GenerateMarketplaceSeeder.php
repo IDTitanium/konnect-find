@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\MarketplaceProductNamer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -37,7 +38,7 @@ class GenerateMarketplaceSeeder extends Command
     private const CATEGORIES = [
         ['Women Fashion', 'Ankara Midi Dress', 'fashion', '1595777457583-95e059d581b8', ['ankara', 'owambe', 'dress', 'women']],
         ['Men Fashion', 'Premium Senator Kaftan', 'fashion', '1617137968427-85924c800a22', ['senator', 'kaftan', 'men', 'traditional']],
-        ['Traditional Fabrics', 'Handwoven Aso Oke Bundle', 'fashion', '1583391733956-6c78276477e2', ['aso oke', 'fabric', 'traditional', 'ceremony']],
+        ['Traditional Fabrics', 'Handwoven Aso Oke Bundle', 'fashion', '1551488831-00ddcb6c6bd3', ['aso oke', 'fabric', 'traditional', 'ceremony']],
         ['Footwear', 'Everyday Leather Loafers', 'footwear', '1533867617858-e7b97e060509', ['shoes', 'loafers', 'office', 'leather']],
         ['Sneakers', 'Street Runner Sneakers', 'footwear', '1542291026-7eec264c27ff', ['sneakers', 'kicks', 'trainers', 'durable']],
         ['Bags', 'Durable School Backpack', 'bags', '1553062407-98eeb64c6a62', ['bag', 'school', 'pikin', 'backpack']],
@@ -67,7 +68,7 @@ class GenerateMarketplaceSeeder extends Command
         ['Books', 'Nigerian Contemporary Fiction Set', 'books', '1495446815901-a7297e633e8d', ['books', 'fiction', 'nigerian', 'reading']],
         ['Stationery', 'School Stationery Bundle', 'books', '1455390582262-044cdead277a', ['school', 'stationery', 'books', 'students']],
         ['Agriculture', 'Small Farm Starter Tools', 'agriculture', '1500937386664-56d1dfef3854', ['farm', 'agriculture', 'tools', 'garden']],
-        ['Tools', 'Professional Hand Tool Box', 'tools', '1581147036324-c1c89c2c8b5c', ['tools', 'repair', 'hardware', 'professional']],
+        ['Tools', 'Professional Hand Tool Box', 'tools', '1581783898377-1c85bf937427', ['tools', 'repair', 'hardware', 'professional']],
         ['Office', 'Ergonomic Office Chair', 'office', '1505843490538-5133c6c7d0e1', ['office', 'chair', 'work', 'ergonomic']],
         ['Watches', 'Classic Everyday Wristwatch', 'accessories', '1523275335684-37898b6baf30', ['watch', 'wristwatch', 'accessories', 'gift']],
         ['Jewellery', 'Gold Plated Jewellery Set', 'accessories', '1515562141207-7a88fb7ce338', ['jewellery', 'gold', 'accessories', 'occasion']],
@@ -139,7 +140,7 @@ class GenerateMarketplaceSeeder extends Command
             'slug' => Str::slug($name),
             'description' => "$name is an independent Nigerian marketplace vendor serving customers from $location with carefully selected local and imported products.",
             'logo_url' => strtoupper(substr($prefix, 0, 1).substr($suffix, 0, 1)),
-            'banner_url' => 'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?auto=format&fit=crop&w=1200&q=80&sig='.$number,
+            'banner_url' => $this->unsplashUrl('1555529669-e69e7aa0ba9a', 1200, 80, $number),
             'location' => $location,
             'is_verified' => $number % 5 !== 0,
             'rating' => round(4 + (($number * 13) % 10) / 10, 1),
@@ -152,19 +153,19 @@ class GenerateMarketplaceSeeder extends Command
     {
         $category = self::CATEGORIES[(($vendor * 11) + $product + $seed) % count(self::CATEGORIES)];
         [$categoryName, $baseName, $department, $photoId, $terms] = $category;
-        $edition = str_pad((string) $product, 3, '0', STR_PAD_LEFT);
         $vendorSlug = $this->vendor($vendor, $seed)['slug'];
-        $qualities = ['Premium', 'Classic', 'Smart', 'Durable', 'Everyday', 'Modern', 'Family', 'Professional'];
-        $quality = $qualities[($vendor + $product + $seed) % count($qualities)];
+        $location = self::LOCATIONS[($vendor * 7 + $seed) % count(self::LOCATIONS)];
+        $namer = app(MarketplaceProductNamer::class);
+        $name = $namer->name($categoryName, $baseName, $department, $vendor, $product, $seed);
 
         return [
             'vendor_slug' => $vendorSlug,
-            'name' => "$quality $baseName - Edition $edition",
+            'name' => $name,
             'category' => $categoryName,
-            'description' => "$quality $baseName selected for Nigerian shoppers. Suitable for everyday use and supplied by a trusted $department vendor.",
-            'image_url' => "https://images.unsplash.com/photo-$photoId?auto=format&fit=crop&w=900&q=80&sig=".(($vendor * 1000) + $product),
+            'description' => $namer->description($name, $categoryName, $department, $location),
+            'image_url' => $this->unsplashUrl($photoId, 900, 80, ($vendor * 1000) + $product),
             'price_kobo' => 150000 + ((($vendor * 7919) + ($product * 3571) + $seed) % 85000000),
-            'search_terms' => [...$terms, $department, Str::lower($quality), self::LOCATIONS[($vendor * 7 + $seed) % count(self::LOCATIONS)]],
+            'search_terms' => [...$terms, $department, ...$this->nameTokens($name), $location],
             'seller_sku' => 'V'.str_pad((string) $vendor, 4, '0', STR_PAD_LEFT).'-P'.str_pad((string) $product, 4, '0', STR_PAD_LEFT),
             'inventory_count' => 1 + (($vendor * 17 + $product * 29 + $seed) % 250),
             'is_active' => ($product % 97) !== 0,
@@ -174,5 +175,20 @@ class GenerateMarketplaceSeeder extends Command
     private function formatBytes(int $bytes): string
     {
         return number_format($bytes / 1024 / 1024, 1).' MB';
+    }
+
+    private function unsplashUrl(string $photoId, int $width, int $quality, int $signature): string
+    {
+        return "https://images.unsplash.com/photo-$photoId?ixlib=rb-4.0.3&auto=format&fit=crop&w=$width&q=$quality&sig=$signature";
+    }
+
+    private function nameTokens(string $name): array
+    {
+        return collect(preg_split('/[^a-z0-9]+/', Str::lower($name), -1, PREG_SPLIT_NO_EMPTY))
+            ->filter(fn (string $token): bool => strlen($token) > 2)
+            ->unique()
+            ->take(8)
+            ->values()
+            ->all();
     }
 }

@@ -191,6 +191,85 @@ php artisan search:index --force
 Use PostgreSQL with pgvector for the full catalogue. SQLite and the small seeded
 catalogue remain the recommended local development path.
 
+### Production-Safe Embedding Seeding
+
+For a small production server, do not ask the server to download every product
+image and generate every embedding in one long `search:index` run. Use a stronger
+local machine as the embedding factory, then stream the completed vectors into
+production.
+
+On the local machine, generate/import the same deterministic catalogue and index
+it in resumable slices:
+
+```bash
+cd backend
+php artisan marketplace:generate-seeder
+php artisan marketplace:import-seeder --fresh --batch=1000
+php artisan search:index --only=text --limit=5000 --chunk=250
+php artisan search:index --only=image --limit=1000 --chunk=100 --sleep-ms=100
+```
+
+Repeat the `search:index` commands until no products remain. For a full local
+run, omit `--limit`. If a run stops, resume from the reported product ID:
+
+```bash
+php artisan search:index --only=image --start-after-id=125000 --limit=1000 --chunk=100 --sleep-ms=100
+```
+
+Export the indexed vectors:
+
+```bash
+php artisan search:export-embeddings --path=storage/app/product-embeddings.jsonl
+```
+
+Deploy or upload both the catalogue JSON and `product-embeddings.jsonl` to the
+production server. On production, import the catalogue first, then stream the
+precomputed embeddings:
+
+```bash
+cd backend
+php artisan marketplace:import-seeder --fresh --batch=1000
+php artisan search:import-embeddings --path=storage/app/product-embeddings.jsonl --batch=100
+```
+
+If an existing database contains old Unsplash URLs that return `404`, repair
+them before regenerating image embeddings:
+
+```bash
+php artisan marketplace:repair-image-urls --dry-run
+php artisan marketplace:repair-image-urls
+php artisan search:index --only=image --limit=100 --chunk=50 --sleep-ms=250
+```
+
+The repair command adds the required Unsplash CDN parameter, replaces known dead
+photo IDs, updates vendor banners, and clears stale product image embeddings for
+changed product URLs.
+
+If an existing generated catalogue still has generic names such as
+`Premium Ankara Midi Dress - Edition 001`, repair product names before
+regenerating text embeddings:
+
+```bash
+php artisan marketplace:repair-product-names --dry-run
+php artisan marketplace:repair-product-names
+php artisan search:index --only=text --limit=500 --chunk=100
+```
+
+The name repair command uses each generated product's `seller_sku` and category
+to create more realistic category-specific names, then clears stale text
+embeddings. Image embeddings are left untouched.
+
+The import command updates the JSON embedding columns and the pgvector columns.
+It checks vector dimensions before writing, so a mismatch such as 64-dimensional
+local image embeddings against a differently migrated production vector column
+fails with a clear error. After this, run `search:index` on production only for
+new or changed products, preferably in small batches:
+
+```bash
+php artisan search:index --only=text --limit=500 --chunk=100
+php artisan search:index --only=image --limit=100 --chunk=50 --sleep-ms=250
+```
+
 ## Search Evaluation
 
 KonnectFind includes an offline relevance set at:
